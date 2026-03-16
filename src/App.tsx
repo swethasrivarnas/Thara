@@ -68,6 +68,10 @@ export default function App() {
           onopen: () => {
             setIsConnected(true);
             startMic();
+            // Trigger initial greeting
+            session.sendRealtimeInput({
+              text: "The child has just joined the session. Please greet them warmly with 'Hi' or 'Hello' and introduce yourself as THARA."
+            });
           },
           onmessage: async (message) => {
             // Handle Audio
