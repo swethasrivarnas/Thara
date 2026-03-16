@@ -72,6 +72,31 @@ If deploying to Google Cloud Run:
 
 ---
 
+## 🏗️ Architecture Diagram
+
+The following diagram illustrates the data flow and integration between the React frontend, the Gemini Live API, and the Image Generation service.
+
+```mermaid
+graph TD
+    User((Child)) -->|Voice/PCM| Frontend[React Frontend]
+    Frontend -->|Live API| GeminiLive[Gemini 2.5 Flash Live]
+    GeminiLive -->|Tool Call: generate_image| GeminiImage[Gemini 2.5 Flash Image]
+    GeminiImage -->|Base64 Image| Frontend
+    Frontend -->|Audio Stream| User
+    
+    subgraph Google Cloud Platform
+        CloudRun[Cloud Run]
+        CloudBuild[Cloud Build]
+        ArtifactRegistry[Artifact Registry]
+    end
+    
+    CloudBuild -->|Builds & Pushes| ArtifactRegistry
+    ArtifactRegistry -->|Deploys to| CloudRun
+    CloudRun -->|Serves| Frontend
+```
+
+---
+
 ## 🛠️ Tech Stack
 - **Frontend**: React, Tailwind CSS, Motion (Framer Motion)
 - **AI**: Gemini 2.5 Flash (Live API), Gemini 2.5 Flash Image
