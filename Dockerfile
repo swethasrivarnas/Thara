@@ -21,9 +21,9 @@ FROM nginx:stable-alpine
 # Copy the build output from the build stage
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Add nginx configuration to handle SPA routing
+# Add nginx configuration to handle SPA routing and dynamic PORT
 RUN printf "server {\n\
-    listen 80;\n\
+    listen 8080;\n\
     location / {\n\
         root /usr/share/nginx/html;\n\
         index index.html index.htm;\n\
@@ -31,6 +31,5 @@ RUN printf "server {\n\
     }\n\
 }\n" > /etc/nginx/conf.d/default.conf
 
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+# Use a shell script to replace the port at runtime and start nginx
+CMD ["/bin/sh", "-c", "sed -i 's/listen 8080;/listen '\"${PORT:-8080}\"';/g' /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"]
