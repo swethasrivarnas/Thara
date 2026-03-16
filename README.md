@@ -57,13 +57,21 @@ Since the app relies on real-time AI interactions, follow these steps to verify 
 3. Say a simple word like *"Apple"* or *"Cat"*.
 4. **Expected Result**: THARA should respond with a warm voice, acknowledge the word, and create a rhyme.
 
-#### B. Visual Generation Test
-1. While in a session, say: *"I see a blue dog in a yellow hat."*
-2. **Expected Result**: The display area should show a "Making Magic..." loading state and then render a generated image matching your description.
+#### B. Visual Generation & Grounding Test
+1. While in a session, say: *"Show me a picture of a rare Quokka."*
+2. **Expected Result**: THARA should use **Google Search Grounding** to understand the rare animal and generate an accurate image.
 
-#### C. Phonics & Spelling Test
-1. Listen to THARA's response.
-2. **Expected Result**: THARA should spell out the word (e.g., "C-A-T") and ask you to repeat a simple sentence.
+#### C. Transcription & Literacy Test
+1. Speak to THARA.
+2. **Expected Result**: You should see your words appear in a blue box ("You said: ...") and THARA's response appear in a warm box.
+
+#### D. Magic Wand (Word Explainer) Test
+1. After THARA speaks, hover over her text and click the **Sparkle/Magic Wand** icon.
+2. **Expected Result**: THARA will use **Gemini 3.1 Pro** to provide a simple, one-sentence explanation of the last word she said.
+
+#### E. Proactive Nudge Test
+1. Start a session and remain silent for 10 seconds.
+2. **Expected Result**: THARA should proactively send a text/voice message asking if you are still there.
 
 ### 4. Deployment Verification
 If deploying to Google Cloud Run:
@@ -80,9 +88,12 @@ The following diagram illustrates the data flow and integration between the Reac
 graph TD
     User((Child)) -->|Voice/PCM| Frontend[React Frontend]
     Frontend -->|Live API| GeminiLive[Gemini 2.5 Flash Live]
-    GeminiLive -->|Tool Call: generate_image| GeminiImage[Gemini 2.5 Flash Image]
+    GeminiLive -->|Tool Call: generate_image| GeminiImage[Gemini 3.1 Flash Image]
+    GeminiImage -->|Search Grounding| GoogleSearch[Google Search]
     GeminiImage -->|Base64 Image| Frontend
-    Frontend -->|Audio Stream| User
+    Frontend -->|Magic Wand Click| GeminiPro[Gemini 3.1 Pro]
+    GeminiPro -->|Simple Explanation| Frontend
+    Frontend -->|Audio & Transcripts| User
     
     subgraph Google Cloud Platform
         CloudRun[Cloud Run]
@@ -99,6 +110,17 @@ graph TD
 
 ## 🛠️ Tech Stack
 - **Frontend**: React, Tailwind CSS, Motion (Framer Motion)
-- **AI**: Gemini 2.5 Flash (Live API), Gemini 2.5 Flash Image
+- **AI Core**: Gemini 2.5 Flash (Live API)
+- **Visuals**: Gemini 3.1 Flash Image (with Google Search Grounding)
+- **Reasoning**: Gemini 3.1 Pro (for "Magic Wand" word explanations)
 - **Icons**: Lucide React
 - **Deployment**: Docker, Google Cloud Run
+
+---
+
+## ✨ Key Features
+- **Real-time Voice Interaction**: Low-latency PCM audio streaming for natural conversation.
+- **Multimodal Transcriptions**: Visual feedback of both user and AI speech to aid literacy.
+- **Grounded Image Generation**: AI-generated visuals that use real-world search data for accuracy.
+- **Proactive Engagement**: Agentic "nudge" logic to keep children engaged during silence.
+- **Educational Explainer**: One-click "Magic Wand" to simplify complex vocabulary.

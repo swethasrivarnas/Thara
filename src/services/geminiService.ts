@@ -9,7 +9,6 @@ LANGUAGE CONSTRAINT:
 - If the child speaks in a language other than English, gently respond in English and encourage them to try English words.
 
 CORE INTERACTION LOOP:
-0. Greeting: When the session starts, greet the child warmly with "Hi!" or "Hello!" and introduce yourself as THARA. Ask them what they would like to talk or read about today.
 1. Multimodal Input: The child can say one or many things! They might mention multiple animals, shapes, colors, places, names, or things (e.g., "A blue cat and a square star in the park with Sam"). 
 2. Visual Generation & Acknowledgment: At the VERY BEGINNING of your response, call the 'generate_image' tool to create a magic picture that combines EVERYTHING the child mentioned. 
    - WHILE the magic is happening, acknowledge everything they said with joy: "Wow! A blue cat AND a square star? You are so creative! I am making a magic picture for you right now!"
@@ -59,18 +58,20 @@ export function getGeminiClient() {
 export async function generateImage(prompt: string) {
   const ai = getGeminiClient();
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-image",
+    model: "gemini-3.1-flash-image-preview",
     contents: [{ parts: [{ text: prompt }] }],
     config: {
       imageConfig: {
         aspectRatio: "1:1",
-      }
+        imageSize: "1K"
+      },
+      tools: [{ googleSearch: {} }]
     }
   });
 
-  const imagePart = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+  const imagePart = response.candidates?.[0]?.content?.parts.find(part => part.inlineData);
   if (imagePart?.inlineData) {
-    return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
+    return `data:image/png;base64,${imagePart.inlineData.data}`;
   }
   return null;
 }

@@ -15,6 +15,15 @@ const COLORS = [
   'bg-pink-400', 'bg-yellow-400', 'bg-blue-400', 'bg-green-400', 'bg-purple-400'
 ];
 
+declare global {
+  interface Window {
+    aistudio?: {
+      hasSelectedApiKey: () => Promise<boolean>;
+      openSelectKey: () => Promise<void>;
+    };
+  }
+}
+
 export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -22,26 +31,47 @@ export default function App() {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [lastTranscript, setLastTranscript] = useState("");
   const [tharaTranscript, setTharaTranscript] = useState("");
-  const [nudgeTimer, setNudgeTimer] = useState<number | null>(null);
+  const [userTranscript, setUserTranscript] = useState("");
   const [isError, setIsError] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(false);
 
   const sessionRef = useRef<any>(null);
   const audioHandlerRef = useRef<AudioHandler | null>(null);
   const stopMicRef = useRef<(() => void) | null>(null);
 
+  // Check for API Key selection on mount
+  useEffect(() => {
+    const checkKey = async () => {
+      if (window.aistudio) {
+        const selected = await window.aistudio.hasSelectedApiKey();
+        setHasApiKey(selected);
+      } else {
+        setHasApiKey(true); 
+      }
+    };
+    checkKey();
+  }, []);
+
+  const openKeyDialog = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      setHasApiKey(true);
+    }
+  };
+
   // Nudge logic
   useEffect(() => {
-    if (isConnected && !isListening) {
+    if (isConnected && isListening) {
       const timer = window.setTimeout(() => {
         if (sessionRef.current) {
-          // Send a nudge if silent for 5 seconds
-          // In a real Live API, we might just wait for the model to nudge itself if instructed,
-          // but we can also trigger it.
+          sessionRef.current.sendRealtimeInput({
+            text: "Are you still there? I'm waiting for your magic words!"
+          });
         }
-      }, 5000);
+      }, 10000); // Nudge after 10 seconds of silence
       return () => clearTimeout(timer);
     }
-  }, [isConnected, isListening]);
+  }, [isConnected, isListening, userTranscript]);
 
   const startSession = async () => {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -50,6 +80,10 @@ export default function App() {
       setIsError(true);
       return;
     }
+    if (!hasApiKey && window.aistudio) {
+      await openKeyDialog();
+    }
+
     try {
       setIsError(false);
       const ai = new GoogleGenAI({ apiKey });
@@ -61,26 +95,37 @@ export default function App() {
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } }, // Warm, melodic voice
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } },
           },
           systemInstruction: SYSTEM_INSTRUCTION,
           tools: [{ functionDeclarations: [IMAGE_GEN_TOOL] }],
+          inputAudioTranscription: {},
+          outputAudioTranscription: {},
         },
         callbacks: {
           onopen: () => {
             setIsConnected(true);
             startMic();
           },
-          onmessage: async (message) => {
+          onmessage: async (message: any) => {
             // Handle Audio
             const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
             if (base64Audio && audioHandlerRef.current) {
               audioHandlerRef.current.playPcmChunk(base64Audio);
             }
 
-            // Handle Transcriptions (for UI feedback)
-            if (message.serverContent?.modelTurn?.parts[0]?.text) {
-              setTharaTranscript(prev => prev + " " + message.serverContent?.modelTurn?.parts[0]?.text);
+            // Handle Transcriptions
+            if (message.serverContent?.modelTurn?.parts) {
+              const text = message.serverContent.modelTurn.parts.map((p: any) => p.text).join("");
+              if (text) setTharaTranscript(text);
+            }
+            
+            if (message.serverContent?.userTurn?.parts) {
+              const text = message.serverContent.userTurn.parts.map((p: any) => p.text).join("");
+              if (text) {
+                setUserTranscript(text);
+                setTharaTranscript(""); 
+              }
             }
 
             // Handle Tool Calls
@@ -93,7 +138,6 @@ export default function App() {
                   setCurrentImage(imageUrl);
                   setIsGeneratingImage(false);
                   
-                  // Send response back to model
                   session.sendToolResponse({
                     functionResponses: [{
                       id: call.id,
@@ -105,14 +149,11 @@ export default function App() {
               }
             }
 
-            // Handle Interruption
             if (message.serverContent?.interrupted) {
-              // Stop audio playback if needed
+              if (audioHandlerRef.current) audioHandlerRef.current.stop();
             }
           },
-          onclose: () => {
-            stopSession();
-          },
+          onclose: () => stopSession(),
           onerror: (err) => {
             console.error("Live API Error:", err);
             stopSession();
@@ -148,6 +189,21 @@ export default function App() {
     setIsConnected(false);
     setIsListening(false);
     sessionRef.current = null;
+  };
+
+  const explainWord = async (word: string) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return;
+    
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-pro-preview",
+      contents: `Explain the word "${word}" to a 4-year-old in one very simple, happy sentence.`,
+    });
+    
+    if (response.text) {
+      setTharaTranscript(response.text);
+    }
   };
 
   return (
@@ -260,9 +316,21 @@ export default function App() {
                 <p className="text-[#5A5A40] font-medium text-lg animate-pulse">
                   THARA is listening...
                 </p>
+                {userTranscript && (
+                  <div className="mt-2 p-3 bg-blue-50/50 rounded-xl border border-blue-100 text-blue-600 text-sm font-medium">
+                    You said: "{userTranscript}"
+                  </div>
+                )}
                 {tharaTranscript && (
-                  <div className="mt-4 p-4 bg-white/50 rounded-2xl border border-white text-[#5A5A40] italic">
-                    "{tharaTranscript.split('.').pop()}"
+                  <div className="mt-4 p-4 bg-white/50 rounded-2xl border border-white text-[#5A5A40] italic relative group">
+                    "{tharaTranscript}"
+                    <button 
+                      onClick={() => explainWord(tharaTranscript.split(' ').pop()?.replace(/[.,!]/g, '') || "")}
+                      className="absolute -right-2 -top-2 bg-yellow-400 text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Explain the last word!"
+                    >
+                      <Sparkles size={16} />
+                    </button>
                   </div>
                 )}
               </div>
