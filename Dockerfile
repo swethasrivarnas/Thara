@@ -32,4 +32,4 @@ RUN printf "server {\n\
 }\n" > /etc/nginx/conf.d/default.conf
 
 # Use a shell script to replace the port at runtime and start nginx
-CMD ["/bin/sh", "-c", "sed -i 's/listen 8080;/listen '\"${PORT:-8080}\"';/g' /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"]
+CMD ["/bin/sh", "-c", "sed -i \"s/listen 8080;/listen ${PORT:-8080};/g\" /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"]
