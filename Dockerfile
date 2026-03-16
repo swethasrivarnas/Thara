@@ -1,6 +1,9 @@
 # Build stage
 FROM node:20-slim AS build
 
+ARG GEMINI_API_KEY
+ENV GEMINI_API_KEY=$GEMINI_API_KEY
+
 WORKDIR /app
 
 # Copy package files

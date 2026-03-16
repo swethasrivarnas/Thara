@@ -23,6 +23,7 @@ export default function App() {
   const [lastTranscript, setLastTranscript] = useState("");
   const [tharaTranscript, setTharaTranscript] = useState("");
   const [nudgeTimer, setNudgeTimer] = useState<number | null>(null);
+  const [isError, setIsError] = useState(false);
 
   const sessionRef = useRef<any>(null);
   const audioHandlerRef = useRef<AudioHandler | null>(null);
@@ -43,13 +44,14 @@ export default function App() {
   }, [isConnected, isListening]);
 
   const startSession = async () => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error("GEMINI_API_KEY is missing from the environment.");
+      setIsError(true);
+      return;
+    }
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        alert("Please set your GEMINI_API_KEY in the environment.");
-        return;
-      }
-
+      setIsError(false);
       const ai = new GoogleGenAI({ apiKey });
       audioHandlerRef.current = new AudioHandler();
       await audioHandlerRef.current.init();
@@ -68,10 +70,6 @@ export default function App() {
           onopen: () => {
             setIsConnected(true);
             startMic();
-            // Trigger initial greeting
-            session.sendRealtimeInput({
-              text: "The child has just joined the session. Please greet them warmly with 'Hi' or 'Hello' and introduce yourself as THARA."
-            });
           },
           onmessage: async (message) => {
             // Handle Audio
@@ -219,15 +217,23 @@ export default function App() {
         {/* Controls */}
         <div className="mt-12 flex flex-col items-center gap-6 w-full">
           {!isConnected ? (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={startSession}
-              className="px-12 py-6 bg-[#FF6B6B] text-white rounded-full text-2xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center gap-4"
-            >
-              <Mic size={32} />
-              Start Talking
-            </motion.button>
+            <>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={startSession}
+                className="px-12 py-6 bg-[#FF6B6B] text-white rounded-full text-2xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center gap-4"
+              >
+                <Mic size={32} />
+                Start Talking
+              </motion.button>
+              {isError && (
+                <p className="text-red-500 font-medium text-center mt-4">
+                  Oops! THARA needs a magic key to start. <br/>
+                  <span className="text-sm">Please set GEMINI_API_KEY in your deployment settings.</span>
+                </p>
+              )}
+            </>
           ) : (
             <div className="flex flex-col items-center gap-4">
               <div className="flex items-center gap-4">
